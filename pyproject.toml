@@ -9,12 +9,16 @@ description = "Hierarchical agglomerative clustering with soft constraints (SciP
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
-authors = [{ name = "van Dreven", email = "jva@bth.se" }]
-keywords = ["clustering", "hierarchical", "linkage", "constraints"]
-dependencies = ["numpy>=1.20"]
+authors = [
+  { name = "Jonne van Dreven", email = "jva@bth.se" }
+]
+keywords = ["clustering", "hierarchical", "linkage", "constraints", "HAC"]
+dependencies = [
+  "numpy>=1.20"
+]
 
 [project.optional-dependencies]
-test = [
+dev = [
   "pytest>=7",
   "scipy>=1.8"
 ]
@@ -22,9 +26,15 @@ test = [
 [project.urls]
 Homepage = "https://github.com/jonnevd/constrained-linkage"
 Issues = "https://github.com/jonnevd/constrained-linkage/issues"
+Documentation = "https://github.com/jonnevd/constrained-linkage#readme"
+Source = "https://github.com/jonnevd/constrained-linkage"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/constrained_linkage"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/constrained_linkage", "README.md", "LICENSE"]
+include = [
+  "src/constrained_linkage",
+  "README.md",
+  "LICENSE"
+]
