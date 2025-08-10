@@ -43,6 +43,7 @@ A **NumPy-only** hierarchical agglomerative clustering routine with **soft const
 ## 🔧 Install
 
 ```bash
+pip install constrained-linkage
 # from source:
 pip install "git+https://github.com/jonnevd/constrained-linkage"
 ```
