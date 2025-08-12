@@ -1,4 +1,4 @@
-[![Tests](https://github.com/jonnevd/constrained-linkage/actions/workflows/tests.yml/badge.svg)](https://github.com/jonnevd/constrained-linkage/actions/workflows/tests.yml)
+[![Tests](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml/badge.svg)](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml)
 [![PyPI version](https://img.shields.io/pypi/v/constrained-linkage.svg)](https://pypi.org/project/constrained-linkage/)
 
 # Constrained Hierarchical Agglomerative Clustering
