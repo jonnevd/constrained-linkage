@@ -45,6 +45,16 @@ A **NumPy-only** hierarchical agglomerative clustering routine with **soft const
 
 ---
 
+## 🔌 Plug-and-play
+
+`constrained_linkage` is a **drop-in replacement** for SciPy’s `linkage` function.  
+
+- **No constraints?** Works identically to `scipy.cluster.hierarchy.linkage`.  
+- **With constraints?** Adds powerful, flexible soft constraints with minimal code changes.  
+- Output is a **SciPy-compatible linkage matrix `Z`**, so you can keep using all SciPy tools (e.g., `fcluster`, `dendrogram`) unchanged.
+
+---
+
 ## 🔧 Install
 
 ```bash
