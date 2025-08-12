@@ -72,6 +72,7 @@ import numpy as np
 from constrained_linkage import constrained_linkage
 from scipy.cluster import hierarchy as hierarchy
 from scipy.spatial.distance import squareform
+import matplotlib.pyplot as plt
 
 # ==== Example 1: Using a constraint matrix ====
 
@@ -95,6 +96,12 @@ Z_con = constrained_linkage(
 labels_con = hierarchy.fcluster(Z_con, 2, criterion="maxclust")
 print("Cluster labels (with shouldnot-link constraint):", labels_con)
 
+# Plot dendrogram
+plt.figure(figsize=(6, 3))
+hierarchy.dendrogram(Z_con, labels=[f"P{i}" for i in range(len(X))])
+plt.title("Dendrogram with cannot-link constraint")
+plt.show()
+
 
 # ==== Example 2: Enforcing a maximum cluster size ====
 
@@ -113,4 +120,35 @@ Z_max_size = constrained_linkage(
 # Cluster into 3 groups (will respect size limit)
 labels_max = hierarchy.fcluster(Z_max_size, 3, criterion="maxclust")
 print("Cluster labels (with max size = 2):", labels_max)
+
+# Plot dendrogram
+plt.figure(figsize=(6, 3))
+hierarchy.dendrogram(Z_max_size, labels=[f"P{i}" for i in range(len(X))])
+plt.title("Dendrogram with max cluster size = 2")
+plt.show()
+
+
+# ==== Example 3: Enforcing a minimum cluster size ====
+
+# Same 6 points in 1D space
+X = np.array([[0.0], [0.1], [5.0], [5.1], [10.0], [10.1]])
+D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
+
+# Run constrained linkage with min cluster size = 3
+Z_min_size = constrained_linkage(
+    D, method="average",
+    min_cluster_size=3,
+    min_penalty_weight=0.5,
+    normalize_distances=True
+)
+
+# Force into 2 clusters (minimum size will be respected)
+labels_min = hierarchy.fcluster(Z_min_size, 2, criterion="maxclust")
+print("Cluster labels (with min size = 3):", labels_min)
+
+# Plot dendrogram
+plt.figure(figsize=(6, 3))
+hierarchy.dendrogram(Z_min_size, labels=[f"P{i}" for i in range(len(X))])
+plt.title("Dendrogram with min cluster size = 3")
+plt.show()
 ```
