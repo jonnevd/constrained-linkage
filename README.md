@@ -40,7 +40,7 @@ A **NumPy-only** hierarchical agglomerative clustering routine with **soft const
     - `M[i,j] > 0` → discourages merging (cannot-link)
     - When `normalize_distances=True`, these penalties are scaled relative to the [0, 1] normalized distance range, making them proportional regardless of the original distance scale.
   - **Min/max cluster size** penalties (linear in violation amount)
-    -Similarly scales proportionally when `normalize_distances=True`
+    - Similarly scales proportionally when `normalize_distances=True`
 - No SciPy dependency — output `Z` works with SciPy’s downstream tools.
 
 ---
