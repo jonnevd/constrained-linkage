@@ -1,3 +1,4 @@
+# .github/workflows/tests.yml
 name: Tests
 
 on:
@@ -24,8 +25,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ".[test]"
-          pip install coverage
+          pip install -e .
+          pip install pytest scipy coverage
+          python -c "import pytest, numpy; print('pytest', pytest.__version__)"
 
       - name: Run tests with coverage
         run: |
