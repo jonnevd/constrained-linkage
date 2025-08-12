@@ -1,3 +1,6 @@
+[![Tests](https://github.com/jonnevd/constrained-linkage/actions/workflows/tests.yml/badge.svg)](https://github.com/jonnevd/constrained-linkage/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/constrained-linkage.svg)](https://pypi.org/project/constrained-linkage/)
+
 # Constrained Hierarchical Agglomerative Clustering
 This repository contains the implementation of the constrained linkage function for Constrained Hierarchical Agglomerative Clustering from the paper:
 
