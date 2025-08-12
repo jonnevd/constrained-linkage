@@ -38,7 +38,9 @@ A **NumPy-only** hierarchical agglomerative clustering routine with **soft const
   - **Must-link / Cannot-link** via a constraint matrix `M`
     - `M[i,j] < 0` → encourages merging (must-link)
     - `M[i,j] > 0` → discourages merging (cannot-link)
+    - When `normalize_distances=True`, these penalties are scaled relative to the [0, 1] normalized distance range, making them proportional regardless of the original distance scale.
   - **Min/max cluster size** penalties (linear in violation amount)
+    -Similarly scales proportionally when `normalize_distances=True`
 - No SciPy dependency — output `Z` works with SciPy’s downstream tools.
 
 ---
@@ -67,7 +69,7 @@ from scipy.spatial.distance import squareform
 X = np.array([[0.0], [0.1], [10.0], [10.1]])
 D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
 
-# Constraint matrix: discourage merging points 0 and 1 (shouldnot-link)
+# Constraint matrix: discourage merging points 0 and 1 (cannot-link)
 M = np.zeros_like(D)
 M[0, 1] = M[1, 0] = 1.0   # Positive values discourage merges
 # Could also use negative values to encourage must-link merges
