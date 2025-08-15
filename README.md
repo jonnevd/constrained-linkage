@@ -139,7 +139,9 @@ print("Partition with max_cluster_size=2:", labels_max)
 
 When domain knowledge suggests small units should coalesce before analysis, use a minimum size prior to avoid singletons or small groups. Increasing the penalty weight strengthens this bias, as shown in the figure below.
 
-![Effect of min_cluster_size penalty on small clusters](docs/min_cluster_effect.png)
+<p align="center">
+  <img src="docs/min_cluster_effect.png" alt="Effect of min_cluster_size penalty on small clusters" width="500">
+</p>
 
 ```python
 import numpy as np
