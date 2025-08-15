@@ -65,90 +65,98 @@ pip install "git+https://github.com/jonnevd/constrained-linkage"
 
 ---
 
-## 🚀 Usage Example
+## 🚀 Usage Examples
+
+Below we illustrate **must-link** (negative penalties) and **cannot-link** (positive penalties) via the constraint matrix `M`.  
+All distances are optionally scaled to `[0,1]` when `normalize_distances=True`, so penalties are **scale-free**.
+
+> **Semantics:**  
+> - `M[i, j] < 0` → **must-link** (encourage merging i↔j)  
+> - `M[i, j] > 0` → **cannot-link** (discourage merging i↔j)
+
+---
+
+### Example 1 — Must-link & Cannot-link constraints
 
 ```python
 import numpy as np
 from constrained_linkage import constrained_linkage
-from scipy.cluster import hierarchy as hierarchy
-from scipy.spatial.distance import squareform
+from scipy.cluster import hierarchy
 import matplotlib.pyplot as plt
 
-# ==== Example 1: Using a constraint matrix ====
-
-# 4 points in 1D space
+# Four points in 1D (two well-separated pairs)
 X = np.array([[0.0], [0.1], [10.0], [10.1]])
 D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
 
-# Constraint matrix: discourage merging points 0 and 1 (cannot-link)
+# Constraint matrix: must-link 0↔1, cannot-link 2↔3
 M = np.zeros_like(D)
-M[0, 1] = M[1, 0] = 1.0   # Positive values discourage merges
-# Could also use negative values to encourage must-link merges
+M[0, 1] = M[1, 0] = -0.6   # must-link (negative)
+M[2, 3] = M[3, 2] =  0.6   # cannot-link (positive)
 
-# Run constrained linkage
-Z_con = constrained_linkage(
-    D, method="average", 
-    constraint_matrix=M, 
+Z = constrained_linkage(
+    D, method="average",
+    constraint_matrix=M,
     normalize_distances=True
 )
 
-# Cluster into 2 groups
-labels_con = hierarchy.fcluster(Z_con, 2, criterion="maxclust")
-print("Cluster labels (with shouldnot-link constraint):", labels_con)
+# Works seamlessly with SciPy tools
+labels = hierarchy.fcluster(Z, 2, criterion="maxclust")
+print("Partition with must-link(0,1) & cannot-link(2,3):", labels)
 
-# Plot dendrogram
 plt.figure(figsize=(6, 3))
-hierarchy.dendrogram(Z_con, labels=[f"P{i}" for i in range(len(X))])
-plt.title("Dendrogram with cannot-link constraint")
+hierarchy.dendrogram(Z, labels=[f"P{i}" for i in range(len(X))])
+plt.title("Dendrogram — must-link(0,1), cannot-link(2,3)")
+plt.tight_layout()
 plt.show()
+```
 
+### Example 2 — Enforcing a maximum cluster size
 
-# ==== Example 2: Enforcing a maximum cluster size ====
+Discourage clusters larger than a threshold by adding a positive penalty above the maximum.
 
-# 6 points in 1D space (three tight pairs)
+```python
+import numpy as np
+from constrained_linkage import constrained_linkage
+from scipy.cluster import hierarchy
+
+# Six points in 1D (three tight pairs)
 X = np.array([[0.0], [0.1], [5.0], [5.1], [10.0], [10.1]])
 D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
 
-# Run constrained linkage with max cluster size = 2
-Z_max_size = constrained_linkage(
+Z_max = constrained_linkage(
     D, method="average",
-    max_cluster_size=2,
-    max_penalty_weight=0.5,
+    max_cluster_size=2,     # soft cap
+    max_penalty_weight=0.6, # stronger => avoids overgrown clusters
     normalize_distances=True
 )
 
-# Cluster into 3 groups (will respect size limit)
-labels_max = hierarchy.fcluster(Z_max_size, 3, criterion="maxclust")
-print("Cluster labels (with max size = 2):", labels_max)
-
-# Plot dendrogram
-plt.figure(figsize=(6, 3))
-hierarchy.dendrogram(Z_max_size, labels=[f"P{i}" for i in range(len(X))])
-plt.title("Dendrogram with max cluster size = 2")
-plt.show()
+labels_max = hierarchy.fcluster(Z_max, 3, criterion="maxclust")
+print("Partition with max_cluster_size=2:", labels_max)
+```
 
 
-# ==== Example 3: Enforcing a minimum cluster size ====
+### Example 3 — Enforcing a minimum cluster size
 
-# Same 6 points in 1D space
+When domain knowledge suggests small units should coalesce before analysis, use a minimum size prior to avoid singletons or small groups. Increasing the penalty weight strengthens this bias, as shown in the figure below.
+
+![Effect of min_cluster_size penalty on small clusters](docs/min_cluster_effect.png)
+
+```python
+import numpy as np
+from constrained_linkage import constrained_linkage
+from scipy.cluster import hierarchy
+
+# Six points in 1D (three tight pairs)
 X = np.array([[0.0], [0.1], [5.0], [5.1], [10.0], [10.1]])
 D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(-1))
 
-# Run constrained linkage with min cluster size = 3
-Z_min_size = constrained_linkage(
+Z_min = constrained_linkage(
     D, method="average",
-    min_cluster_size=3,
-    min_penalty_weight=0.5,
+    min_cluster_size=3,     # target minimum size
+    min_penalty_weight=0.5, # stronger => merge undersized clusters earlier
     normalize_distances=True
 )
 
-# Force into 2 clusters (minimum size will be respected)
-labels_min = hierarchy.fcluster(Z_min_size, 2, criterion="maxclust")
-print("Cluster labels (with min size = 3):", labels_min)
-
-# Plot dendrogram
-plt.figure(figsize=(6, 3))
-hierarchy.dendrogram(Z_min_size, labels=[f"P{i}" for i in range(len(X))])
-plt.title("Dendrogram with min cluster size = 3")
-plt.show()
+labels_min = hierarchy.fcluster(Z_min, 2, criterion="maxclust")
+print("Partition with min_cluster_size=3:", labels_min)
 ```
