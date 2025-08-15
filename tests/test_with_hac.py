@@ -6,6 +6,8 @@ from constrained_linkage import constrained_linkage
 from scipy.cluster import hierarchy as hierarchy
 from scipy.spatial.distance import squareform
 
+RANDOM_SEED = 42
+
 def make_sines(n_groups=3, per_group=6, length=200, noise=0.05, random_state=0):
     rng = np.random.default_rng(random_state)
     X = []
@@ -30,10 +32,10 @@ def partitions_match(a: np.ndarray, b: np.ndarray) -> bool:
     return np.all(A == B)
 
 def test_unconstrained_matches_scipy_average_partition():
-    X, _ = make_sines(n_groups=3, per_group=5, random_state=1)
+    X, _ = make_sines(n_groups=3, per_group=5, random_state=RANDOM_SEED)
     D = euclidean_square(X)
     # Our linkage
-    Z_ours = constrained_linkage(D, method="average", random_state=0)
+    Z_ours = constrained_linkage(D, method="average")
     # SciPy linkage on the same distances
     d_cond = squareform(D, checks=False)
     Z_sp = hierarchy.linkage(d_cond, method="average", optimal_ordering=False)
@@ -45,7 +47,7 @@ def test_unconstrained_matches_scipy_average_partition():
     assert partitions_match(labels_ours, labels_sp)
 
 def test_constraints_push_within_group_merges_first():
-    X, true_g = make_sines(n_groups=3, per_group=4, random_state=2)
+    X, true_g = make_sines(n_groups=3, per_group=4)
     D = euclidean_square(X)
     n = D.shape[0]
     # Penalize cross-group merges heavily
@@ -55,7 +57,7 @@ def test_constraints_push_within_group_merges_first():
             if true_g[i] != true_g[j]:
                 M[i, j] = 1.0  # discourage cross-group merges
 
-    Z_con = constrained_linkage(D, method="average", constraint_matrix=M, random_state=0)
+    Z_con = constrained_linkage(D, method="average", constraint_matrix=M)
 
     # The partition at k=3 should align with true groups
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
@@ -79,8 +81,7 @@ def test_max_cluster_size_changes_partition():
         method="average",
         max_cluster_size=2,
         max_penalty_weight=0.2,
-        normalize_distances=True,
-        random_state=0,
+        normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
 
@@ -114,7 +115,6 @@ def test_constraint_matrix_should_and_shouldnot_link():
         D,
         method="average",
         constraint_matrix=M,
-        random_state=0,
         normalize_distances=True
     )
 
@@ -147,8 +147,7 @@ def test_max_penalty_enforces_equal_sized_clusters():
         method="average",
         max_cluster_size=2,
         max_penalty_weight=0.3,
-        normalize_distances=True,
-        random_state=0,
+        normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
     sizes_con = sorted(np.bincount(labels_con)[1:])
@@ -186,7 +185,6 @@ def test_min_size_constraint_reduces_singletons():
         min_cluster_size=3,
         min_penalty_weight=0.8,   # penalize merges that would form size < 3
         normalize_distances=True, # put distances on [0,1] so 0.5 is meaningful
-        random_state=0,
     )
     labels_con = hierarchy.fcluster(Z_con, 4, criterion="maxclust")
     sizes_con = sorted(np.bincount(labels_con)[1:])
@@ -208,8 +206,7 @@ def test_penalty_normalization_effect():
         method="average",
         max_cluster_size=2,
         max_penalty_weight=0.5,  # Should be small relative to raw distances
-        normalize_distances=False,
-        random_state=0
+        normalize_distances=False
     )
 
     # Same penalty, but with normalization → penalties now in same scale as distances
@@ -218,8 +215,7 @@ def test_penalty_normalization_effect():
         method="average",
         max_cluster_size=2,
         max_penalty_weight=0.5,
-        normalize_distances=True,
-        random_state=0
+        normalize_distances=True
     )
 
     # The merge distances should differ significantly
@@ -228,15 +224,15 @@ def test_penalty_normalization_effect():
 @pytest.mark.parametrize("method", ["single", "complete", "average", "weighted", "centroid", "median", "ward"])
 def test_method_parity_partitions_with_scipy(method):
     # deterministic medium-sized dataset
-    rng = np.random.default_rng(123)
-    X = rng.normal(size=(12, 4))
+    rng = np.random.default_rng(RANDOM_SEED)
+    X = rng.normal(size=(120, 1))
 
     # Euclidean square + condensed (SciPy expects condensed)
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
     # our linkage (no constraints)
-    Z_ours = constrained_linkage(D, method=method, random_state=0)
+    Z_ours = constrained_linkage(D, method=method)
 
     # SciPy linkage
     Z_sp = hierarchy.linkage(d_cond, method=method, optimal_ordering=False)
@@ -249,12 +245,12 @@ def test_method_parity_partitions_with_scipy(method):
 
 @pytest.mark.parametrize("method", ["single", "complete", "average", "weighted", "centroid", "median", "ward"])
 def test_method_parity_heights_close(method):
-    rng = np.random.default_rng(42)
-    X = rng.normal(size=(10, 3))
+    rng = np.random.default_rng(RANDOM_SEED)
+    X = rng.normal(size=(40, 3))
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    Z_ours = constrained_linkage(D, method=method, random_state=0)
+    Z_ours = constrained_linkage(D, method=method)
     Z_sp = hierarchy.linkage(d_cond, method=method, optimal_ordering=False)
 
     # sort by height then by pair (stable compare)
@@ -268,13 +264,13 @@ def test_method_parity_heights_close(method):
     assert np.allclose(h_ours, h_sp, rtol=1e-6, atol=1e-8), f"height mismatch for method={method}"
 
 def test_accepts_condensed_and_square_equivalently():
-    rng = np.random.default_rng(7)
+    rng = np.random.default_rng(RANDOM_SEED)
     X = rng.normal(size=(8, 3))
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    Z_sq = constrained_linkage(D, method="average", random_state=0)
-    Z_cd = constrained_linkage(d_cond, method="average", random_state=0)
+    Z_sq = constrained_linkage(D, method="average")
+    Z_cd = constrained_linkage(d_cond, method="average")
 
     # compare partitions at several k
     for k in (2, 3, 4):
@@ -290,7 +286,7 @@ def test_all_zero_distances_produces_valid_linkage():
     # Three identical points
     X = np.zeros((3, 2))
     D = euclidean_square(X)
-    Z = constrained_linkage(D, method="average", random_state=0)
+    Z = constrained_linkage(D, method="average")
 
     # Shape should be (n-1, 4)
     assert Z.shape == (2, 4)

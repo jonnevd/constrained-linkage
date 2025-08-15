@@ -11,8 +11,7 @@ def _validate_inputs(
     min_cluster_size: Optional[int],
     max_cluster_size: Optional[int],
     min_penalty_weight: float,
-    max_penalty_weight: float,
-    normalize_distances: bool
+    max_penalty_weight: float
 ) -> None:
     if method not in VALID_METHODS:
         raise ValueError(f"Unknown method: {method!r}. Must be one of {sorted(VALID_METHODS)}")
@@ -24,11 +23,6 @@ def _validate_inputs(
         raise ValueError("min_cluster_size cannot be greater than max_cluster_size")
     if min_penalty_weight < 0 or max_penalty_weight < 0:
         raise ValueError("Penalty weights must be non-negative")
-    if normalize_distances and (min_penalty_weight > 1.0 or max_penalty_weight > 1.0):
-            raise ValueError(
-                "When normalize_distances=True, penalty weights must be in [0, 1]. "
-                f"Got min_penalty_weight={min_penalty_weight}, max_penalty_weight={max_penalty_weight}"
-            )
 
 def _is_square(y: np.ndarray) -> bool:
     return y.ndim == 2 and y.shape[0] == y.shape[1]
@@ -71,15 +65,34 @@ def _validate_constraint_matrix(M: Optional[np.ndarray], n: int) -> np.ndarray:
     np.fill_diagonal(M, 0.0)
     return (M + M.T) / 2.0
 
-def _size_penalty(sa: int, sb: int,
-                  cmin: Optional[int], cmax: Optional[int],
-                  wmin: float, wmax: float) -> float:
-    s = sa + sb
+def _size_penalty(
+    sa: int, sb: int,
+    cmin: Optional[int], cmax: Optional[int],
+    wmin: float, wmax: float
+) -> float:
+    """
+    Soft size penalties:
+      - Min size: encourage merging clusters that are individually below cmin
+                  by subtracting wmin * deficit_a/b (negative penalty).
+      - Max size: discourage merges whose *result* would exceed cmax
+                  by adding wmax * (sa+sb - cmax) (positive penalty).
+
+    Assumes wmin,wmax >= 0. With normalize_distances=True, penalties are
+    scale-free relative to the [0,1] normalized distance range.
+    """
     pen = 0.0
-    if cmin is not None and s < cmin:
-        pen += wmin * (cmin - s)
-    if cmax is not None and s > cmax:
-        pen += wmax * (s - cmax)
+
+    # Encourage merging under-min clusters (acts even when cmin=2)
+    if cmin is not None:
+        deficit_a = max(0, cmin - sa)
+        deficit_b = max(0, cmin - sb)
+        pen -= wmin * float(deficit_a + deficit_b)
+
+    # Discourage creating over-max clusters (post-merge)
+    if cmax is not None:
+        excess = max(0, (sa + sb) - cmax)
+        pen += wmax * float(excess)
+
     return pen
 
 def _lw_update(method: Method,
@@ -117,8 +130,7 @@ def constrained_linkage(
     min_penalty_weight: float = 0.0,
     max_penalty_weight: float = 0.0,
     constraint_matrix: Optional[np.ndarray] = None,
-    normalize_distances: bool = False,
-    random_state: Optional[int] = None,
+    normalize_distances: bool = False
 ) -> np.ndarray:
     """
     Constrained hierarchical linkage (SciPy-compatible Z) with soft size penalties
@@ -141,8 +153,6 @@ def constrained_linkage(
         Negative = encourage; positive = discourage (soft constraints).
     normalize_distances : bool
         If True, divides all base distances by their max so penalty weights live in [0,1].
-    random_state : int or None
-        For reproducible tiny jitter in the tie-breaker.
 
     Returns
     -------
@@ -150,13 +160,7 @@ def constrained_linkage(
         SciPy-compatible linkage matrix with [idx_a, idx_b, dist, size].
         Leaves are 0..n-1, new clusters are n..2n-2.
     """
-    _validate_inputs(
-    y, method, min_cluster_size, max_cluster_size,
-    min_penalty_weight, max_penalty_weight, normalize_distances
-    )
-
-    
-    rng = np.random.default_rng(random_state)
+    _validate_inputs(y, method, min_cluster_size, max_cluster_size, min_penalty_weight, max_penalty_weight)
 
     # Base distances (square)
     D = _to_square(np.asarray(y))
@@ -187,17 +191,17 @@ def constrained_linkage(
         best_i = best_j = -1
         best_val = np.inf
         for i in range(m - 1):
-            jitter = 0.0 if random_state is None else 1e-12 * rng.standard_normal()
             for j in range(i + 1, m):
-                val = adjusted(i, j) + jitter
-                if val < best_val - 1e-15:
+                val = adjusted(i, j)
+                # Primary: strictly smaller distance wins
+                # Tie: lexicographic on original labels
+                if (
+                    val < best_val - 1e-15 or
+                    (abs(val - best_val) <= 1e-15 and
+                    tuple(sorted((labels[i], labels[j]))) <
+                    tuple(sorted((labels[best_i], labels[best_j]))))
+                ):
                     best_val, best_i, best_j = val, i, j
-                elif abs(val - best_val) <= 1e-15:
-                    # deterministic tie-break on (original ids)
-                    a, b = sorted((labels[i], labels[j]))
-                    c, d = sorted((labels[best_i], labels[best_j]))
-                    if (a, b) < (c, d):
-                        best_val, best_i, best_j = val, i, j
 
         i, j = best_i, best_j
         if i > j:

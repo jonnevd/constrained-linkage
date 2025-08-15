@@ -12,7 +12,7 @@ def euclidean_square(X: np.ndarray) -> np.ndarray:
 def test_shapes_and_monotonicity_single():
     X = np.array([[0.0], [0.1], [10.0], [10.1], [20.0]])
     D = euclidean_square(X)
-    Z = constrained_linkage(D, method="single", random_state=0)
+    Z = constrained_linkage(D, method="single")
     n = D.shape[0]
     assert Z.shape == (n - 1, 4)
     # ids are within expected range
@@ -34,8 +34,7 @@ def test_constraints_do_not_break_output():
         D, method="average",
         constraint_matrix=M,
         min_cluster_size=3, max_cluster_size=3,
-        min_penalty_weight=0.5, max_penalty_weight=0.25,
-        random_state=0
+        min_penalty_weight=0.5, max_penalty_weight=0.25
     )
     n = D.shape[0]
     assert Z.shape == (n - 1, 4)
@@ -55,16 +54,14 @@ def test_asymmetric_constraint_matrix_handling():
         Z = constrained_linkage(
             D,
             method="average",
-            constraint_matrix=M,
-            random_state=0
+            constraint_matrix=M
         )
         # If no error, ensure result is same as with symmetrized version
         M_sym = (M + M.T) / 2
         Z_sym = constrained_linkage(
             D,
             method="average",
-            constraint_matrix=M_sym,
-            random_state=0
+            constraint_matrix=M_sym
         )
         assert np.allclose(Z, Z_sym)
     except ValueError:
@@ -79,7 +76,7 @@ def test_small_n_edge_cases():
     # Case n=2 — should return single merge
     D = np.array([[0.0, 1.0],
                   [1.0, 0.0]])
-    Z = constrained_linkage(D, method="single", random_state=0)
+    Z = constrained_linkage(D, method="single")
     assert Z.shape == (1, 4)
     assert int(Z[0, 0]) == 0
     assert int(Z[0, 1]) == 1
@@ -120,14 +117,6 @@ def test_negative_penalty_weight():
         constrained_linkage(np.eye(2), method=VALID_METHODS[0], min_penalty_weight=-0.1)
     with pytest.raises(ValueError, match="must be non-negative"):
         constrained_linkage(np.eye(2), method=VALID_METHODS[0], max_penalty_weight=-0.1)
-
-def test_penalty_weight_above_one_when_normalized():
-    with pytest.raises(ValueError, match="must be in \\[0, 1\\]"):
-        constrained_linkage(np.eye(2), method=VALID_METHODS[0],
-                            min_penalty_weight=1.5, normalize_distances=True)
-    with pytest.raises(ValueError, match="must be in \\[0, 1\\]"):
-        constrained_linkage(np.eye(2), method=VALID_METHODS[0],
-                            max_penalty_weight=1.5, normalize_distances=True)
 
 def test_all_valid_passes():
     # This should NOT raise
