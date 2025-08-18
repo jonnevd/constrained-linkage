@@ -7,6 +7,8 @@ from scipy.cluster import hierarchy as hierarchy
 from scipy.spatial.distance import squareform
 
 RANDOM_SEED = 42
+# For constraint-behavior coverage: pick one from each family.
+CONSTRAINT_METHODS = ["average", "centroid"]  # NN-chain + heap-fallback
 
 def make_sines(n_groups=3, per_group=6, length=200, noise=0.05, random_state=0):
     rng = np.random.default_rng(random_state)
@@ -46,180 +48,115 @@ def test_unconstrained_matches_scipy_average_partition():
     labels_sp = hierarchy.fcluster(Z_sp, k, criterion="maxclust")
     assert partitions_match(labels_ours, labels_sp)
 
-def test_constraints_push_within_group_merges_first():
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_constraints_push_within_group_merges_first(method):
     X, true_g = make_sines(n_groups=3, per_group=4)
     D = euclidean_square(X)
     n = D.shape[0]
-    # Penalize cross-group merges heavily
     M = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
             if true_g[i] != true_g[j]:
-                M[i, j] = 1.0  # discourage cross-group merges
-
-    Z_con = constrained_linkage(D, method="average", constraint_matrix=M)
-
-    # The partition at k=3 should align with true groups
+                M[i, j] = 1.0
+    Z_con = constrained_linkage(D, method=method, constraint_matrix=M)
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
     assert partitions_match(labels_con, true_g)
 
-def test_max_cluster_size_changes_partition():
-    # Simple dataset where three very close points would normally merge into one cluster
-    X = np.array([[0.00], [0.01], [0.02],   # tight triplet
-                  [10.0], [20.0], [30.0]])  # far-apart singles
-
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_max_cluster_size_changes_partition(method):
+    X = np.array([[0.00], [0.01], [0.02], [10.0], [20.0], [30.0]])
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    # Baseline: SciPy average linkage
-    Z_sp = hierarchy.linkage(d_cond, method="average")
+    # Baseline: SciPy (unconstrained) **with the same method**
+    Z_sp = hierarchy.linkage(d_cond, method=method, optimal_ordering=False)
     labels_sp = hierarchy.fcluster(Z_sp, 3, criterion="maxclust")
 
     # Constrained: forbid clusters larger than 2
     Z_con = constrained_linkage(
-        D,
-        method="average",
-        max_cluster_size=2,
-        max_penalty_weight=0.2,
+        D, method=method,
+        max_cluster_size=2, max_penalty_weight=0.2,
         normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
 
-    # They should differ — constraint stops the triplet merge
     assert not partitions_match(labels_sp, labels_con)
 
-def test_constraint_matrix_should_and_shouldnot_link():
-    # Four points in 1D space:
-    # A and D are far apart -> should-link (negative penalty will pull them together)
-    # A and B are very close -> shouldnot-link (positive penalty will push them apart)
-    X = np.array([
-        [0.0],   # 0: A
-        [0.1],   # 1: B
-        [5.0],   # 2: C
-        [10.0],  # 3: D
-    ])
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_constraint_matrix_should_and_shouldnot_link(method):
+    X = np.array([[0.0], [0.1], [5.0], [10.0]])
     D = euclidean_square(X)
     n = D.shape[0]
-
-    # Build constraint matrix
     M = np.zeros((n, n))
+    M[0, 3] = M[3, 0] = -0.5  # should-link
+    M[0, 1] = M[1, 0] =  0.5  # should-not-link
 
-    # Must-link: A (0) and D (3) — strong negative penalty
-    M[0, 3] = M[3, 0] = -0.5
-
-    # Cannot-link: A (0) and B (1) — strong positive penalty
-    M[0, 1] = M[1, 0] = 0.5
-
-    # Run constrained linkage with normalized distances so penalties are comparable
     Z = constrained_linkage(
-        D,
-        method="average",
-        constraint_matrix=M,
-        normalize_distances=True
+        D, method=method,
+        constraint_matrix=M, normalize_distances=True
     )
-
-    # Get 2-cluster partition
     labels = hierarchy.fcluster(Z, 2, criterion="maxclust")
-
-    # Should-link check: A and D together
     assert labels[0] == labels[3]
-    # Shoudlnot-link check: A and B apart
     assert labels[0] != labels[1]
 
-def test_max_penalty_enforces_equal_sized_clusters():
-    # Arrange: tight group of 4 and two far-away points
-    X = np.array([
-        [0.00], [0.01], [0.02], [0.03],  # tight group
-        [10.0],                          # singleton
-        [20.0],                          # singleton
-    ])
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_max_penalty_enforces_equal_sized_clusters(method):
+    X = np.array([[0.00],[0.01],[0.02],[0.03],[10.0],[20.0]])
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    # Without constraint: tight group merges into one big cluster early
-    Z_sp = hierarchy.linkage(d_cond, method="average")
+    Z_sp = hierarchy.linkage(d_cond, method=method, optimal_ordering=False)
     labels_sp = hierarchy.fcluster(Z_sp, 3, criterion="maxclust")
     sizes_sp = sorted(np.bincount(labels_sp)[1:])
 
-    # With constraint: max cluster size 2 and penalty
     Z_con = constrained_linkage(
-        D,
-        method="average",
-        max_cluster_size=2,
-        max_penalty_weight=0.3,
+        D, method=method,
+        max_cluster_size=2, max_penalty_weight=0.3,
         normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")
     sizes_con = sorted(np.bincount(labels_con)[1:])
 
-    # Assert: constrained case yields all equal-sized clusters of size 2
     assert sizes_con == [2, 2, 2]
-
-    # Assert: without constraints, the sizes are *not* all equal
     assert sizes_sp != sizes_con
 
-
-def test_min_size_constraint_reduces_singletons():
-    # dataset: three very close points + several spaced points,
-    # so unconstrained average linkage tends to leave at least one singleton at k=4
-    X = np.array([
-        [0.00], [0.01], [0.02],       # tight triplet
-        [5.0], [10.0], [15.0], [20.0], [25.0]  # spaced singles
-    ])
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_min_size_constraint_reduces_singletons(method):
+    X = np.array([[0.00],[0.01],[0.02],[5.0],[10.0],[15.0],[20.0],[25.0]])
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    # Unconstrained baseline
-    Z_sp = hierarchy.linkage(d_cond, method="average", optimal_ordering=False)
+    Z_sp = hierarchy.linkage(d_cond, method=method, optimal_ordering=False)
     labels_sp = hierarchy.fcluster(Z_sp, 4, criterion="maxclust")
-    sizes_sp = sorted(np.bincount(labels_sp)[1:])  # drop label 0
-    min_size_sp = min(sizes_sp)
+    min_size_sp = min(sorted(np.bincount(labels_sp)[1:]))
 
-    # Constrained: enforce a minimum size tendency.
-    # Note: In our implementation, min penalty is an *additive* term applied when
-    # the RESULTING merge size s < Cmin. Using a positive weight discourages
-    # forming too-small merges; choose Cmin=3 to steer away from tiny clusters.
     Z_con = constrained_linkage(
-        D,
-        method="average",
-        min_cluster_size=3,
-        min_penalty_weight=0.8,   # penalize merges that would form size < 3
-        normalize_distances=True, # put distances on [0,1] so 0.5 is meaningful
+        D, method=method,
+        min_cluster_size=3, min_penalty_weight=0.8,
+        normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 4, criterion="maxclust")
-    sizes_con = sorted(np.bincount(labels_con)[1:])
-    min_size_con = min(sizes_con)
+    min_size_con = min(sorted(np.bincount(labels_con)[1:]))
 
-    # The minimum cluster size with the constraint should be >= the unconstrained one,
-    # and typically > 1 for this dataset.
     assert min_size_con >= min_size_sp
     assert min_size_con >= 2
 
-def test_penalty_normalization_effect():
-    # Points far apart so base distances are huge
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_penalty_normalization_effect(method):
     X = np.array([[0.0], [1000.0], [2000.0]])
     D = euclidean_square(X)
 
-    # Very large scale distances without normalization → penalty negligible
-    Z_no_norm = constrained_linkage(
-        D,
-        method="average",
-        max_cluster_size=2,
-        max_penalty_weight=0.5,  # Should be small relative to raw distances
+    Z_no = constrained_linkage(
+        D, method=method,
+        max_cluster_size=2, max_penalty_weight=0.5,
         normalize_distances=False
     )
-
-    # Same penalty, but with normalization → penalties now in same scale as distances
-    Z_norm = constrained_linkage(
-        D,
-        method="average",
-        max_cluster_size=2,
-        max_penalty_weight=0.5,
+    Z_yes = constrained_linkage(
+        D, method=method,
+        max_cluster_size=2, max_penalty_weight=0.5,
         normalize_distances=True
     )
-
-    # The merge distances should differ significantly
-    assert not np.allclose(Z_no_norm[:, 2], Z_norm[:, 2])
+    assert not np.allclose(Z_no[:, 2], Z_yes[:, 2])
 
 @pytest.mark.parametrize("method", ["single", "complete", "average", "weighted", "centroid", "median", "ward"])
 def test_method_parity_partitions_with_scipy(method):
@@ -263,16 +200,16 @@ def test_method_parity_heights_close(method):
 
     assert np.allclose(h_ours, h_sp, rtol=1e-6, atol=1e-8), f"height mismatch for method={method}"
 
-def test_accepts_condensed_and_square_equivalently():
+@pytest.mark.parametrize("method", CONSTRAINT_METHODS)
+def test_accepts_condensed_and_square_equivalently(method):
     rng = np.random.default_rng(RANDOM_SEED)
     X = rng.normal(size=(8, 3))
     D = euclidean_square(X)
     d_cond = squareform(D, checks=False)
 
-    Z_sq = constrained_linkage(D, method="average")
-    Z_cd = constrained_linkage(d_cond, method="average")
+    Z_sq = constrained_linkage(D, method=method)
+    Z_cd = constrained_linkage(d_cond, method=method)
 
-    # compare partitions at several k
     for k in (2, 3, 4):
         a = hierarchy.fcluster(Z_sq, k, criterion="maxclust")
         b = hierarchy.fcluster(Z_cd, k, criterion="maxclust")
