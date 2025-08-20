@@ -82,6 +82,10 @@ All distances are optionally scaled to `[0,1]` when `normalize_distances=True`, 
 
 ### Example 1 — Must-link & Cannot-link constraints
 
+<p align="center">
+  <img src="https://github.com/jonnevd/constrained-linkage/blob/main/docs/CM_cluster_effect.png" alt="Effect of constraint matrix on clusters" width="500">
+</p>
+
 ```python
 import numpy as np
 from constrained_linkage import constrained_linkage
@@ -144,7 +148,7 @@ print("Partition with max_cluster_size=2:", labels_max)
 When domain knowledge suggests small units should coalesce before analysis, use a minimum size prior to avoid singletons or small groups. Increasing the penalty weight strengthens this bias, as shown in the figure below.
 
 <p align="center">
-  <img src="docs/min_cluster_effect.png" alt="Effect of min_cluster_size penalty on small clusters" width="500">
+  <img src="https://github.com/jonnevd/constrained-linkage/blob/main/docs/min_cluster_effect.png" alt="Effect of min_cluster_size penalty on small clusters" width="500">
 </p>
 
 ```python

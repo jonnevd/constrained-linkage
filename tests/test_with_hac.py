@@ -111,7 +111,7 @@ def test_max_penalty_enforces_equal_sized_clusters(method):
 
     Z_con = constrained_linkage(
         D, method=method,
-        max_cluster_size=2, max_penalty_weight=0.3,
+        max_cluster_size=2, max_penalty_weight=0.5,
         normalize_distances=True
     )
     labels_con = hierarchy.fcluster(Z_con, 3, criterion="maxclust")

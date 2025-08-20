@@ -152,7 +152,6 @@ def _lw_update(method: Method,
         val2 = ((sa + sk)/total) * (dak**2) + ((sb + sk)/total) * (dbk**2) - (sk/total) * (dab**2)
         return np.sqrt(max(val2, 0.0))
     raise ValueError(f"Unknown method {method!r}")
-  
 
 def _sort_and_label(Z_alg: np.ndarray, n: int) -> np.ndarray:
     """
@@ -186,6 +185,46 @@ def _sort_and_label(Z_alg: np.ndarray, n: int) -> np.ndarray:
         old_to_new[n + s] = n + r
 
     return Z_out
+
+def _relabel_algorithm_order(Z_alg: np.ndarray, n: int) -> np.ndarray:
+    """
+    Relabel fastcluster-style ids to canonical [0..n-1, n..2n-2], keeping
+    the current row order (assumed topological: children before parent).
+    """
+    Z_out = Z_alg.copy()
+    old_to_new = {i: i for i in range(n)}  # leaves map to themselves
+    next_id = n
+    for r in range(n - 1):
+        a_old = int(Z_alg[r, 0])
+        b_old = int(Z_alg[r, 1])
+        a_new = old_to_new[a_old]
+        b_new = old_to_new[b_old]
+        if a_new > b_new:
+            a_new, b_new = b_new, a_new
+        Z_out[r, 0] = a_new
+        Z_out[r, 1] = b_new
+        # parent created at this row gets the next canonical id
+        old_to_new[n + r] = next_id
+        next_id += 1
+    return Z_out
+
+def _finalize_Z(Z_alg: np.ndarray,
+                n: int,
+                *,
+                constraints_active: bool) -> np.ndarray:
+    """
+    Produce a valid Z for SciPy consumers.
+    - If constraints are inactive: exact SciPy behavior (sort+label).
+    - If constraints are active: keep algorithm/topological order,
+      make heights nondecreasing, and relabel in that order.
+    """
+    if not constraints_active:
+        return _sort_and_label(Z_alg, n)
+
+    # Keep topo order but enforce nondecreasing heights for clean cuts.
+    Z_topo = Z_alg.copy()
+    Z_topo[:, 2] = np.maximum.accumulate(Z_topo[:, 2])
+    return _relabel_algorithm_order(Z_topo, n)
 
 def nn_chain_constrained(
     D: np.ndarray,
@@ -318,8 +357,12 @@ def nn_chain_constrained(
             # penalties add under merges (soft-constraint accumulation)
             P[b, k] = P[k, b] = P[a, k] + P[b, k]
 
-    Z = _sort_and_label(Z, n)
-    return Z
+    constraints_active = (
+        np.any(P) or
+        (min_penalty_weight > 0) or
+        (max_penalty_weight > 0)
+    )
+    return _finalize_Z(Z, n, constraints_active=constraints_active)
 
 def _fast_linkage_lazy(
     D: np.ndarray,
