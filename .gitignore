@@ -27,6 +27,9 @@ htmlcov/
 .coverage.*
 .cache
 pytest_cache/
+.cache
+.pytest_cache/
+coverage.xml
 
 # OS-specific
 .DS_Store

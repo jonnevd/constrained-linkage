@@ -228,8 +228,6 @@ def nn_chain_constrained(
     - Complexity O(n^2) for reducible methods.
     """
     n = D.shape[0]
-    if n < 2:
-        raise ValueError("Need at least 2 observations.")
 
     sizes = np.ones(n, dtype=int)     # 0 means dead
     labels = list(range(n))           # fastcluster-style ids we write into Z (algorithm order)
@@ -321,93 +319,6 @@ def nn_chain_constrained(
             P[b, k] = P[k, b] = P[a, k] + P[b, k]
 
     Z = _sort_and_label(Z, n)
-    return Z
-
-def _quadratic_linkage(
-    D: np.ndarray,
-    P: np.ndarray,
-    method: Literal["single", "complete", "average", "weighted", "centroid", "median", "ward"] = "single",
-    *,
-    min_cluster_size: Optional[int],
-    max_cluster_size: Optional[int],
-    min_penalty_weight: float,
-    max_penalty_weight: float,
-) -> np.ndarray:
-    """
-    Quadratic O(n^3) linkage.
-
-    Brute-force baseline: at each step, scan all pairs to find the
-    minimum penalized distance.
-
-    Returns
-    -------
-    Z : (n-1, 4) float ndarray
-    """
-    n = D.shape[0]
-    labels = list(range(n))
-    sizes = np.ones(n, dtype=int)
-    Z = np.zeros((n - 1, 4), dtype=float)
-    next_id = n
-
-    def adjusted(i: int, j: int) -> float:
-        si, sj = sizes[i], sizes[j]
-        base = D[i, j]
-        pen = P[i, j] + _size_penalty(si, sj,
-                                      min_cluster_size, max_cluster_size,
-                                      min_penalty_weight, max_penalty_weight)
-        return max(base + pen, 0.0)
-
-    for step in range(n - 1):
-        m = len(labels)
-        best_i = best_j = -1
-        best_val = np.inf
-        for i in range(m - 1):
-            for j in range(i + 1, m):
-                val = adjusted(i, j)
-                # tie-break lexicographically on original labels
-                if (val < best_val - 1e-15 or
-                    (abs(val - best_val) <= 1e-15 and
-                     tuple(sorted((labels[i], labels[j]))) <
-                     tuple(sorted((labels[best_i], labels[best_j]))) )):
-                    best_val, best_i, best_j = val, i, j
-
-        i, j = best_i, best_j
-        if i > j:
-            i, j = j, i
-
-        Zi, Zj = labels[i], labels[j]
-        si, sj = sizes[i], sizes[j]
-        Z[step, 0] = Zi
-        Z[step, 1] = Zj
-        Z[step, 2] = max(best_val, 0.0)
-        Z[step, 3] = si + sj
-
-        new_base, new_pen = [], []
-        for k in range(len(labels)):
-            if k == i or k == j:
-                continue
-            sk = sizes[k]
-            dak, dbk, dab = D[i, k], D[j, k], D[i, j]
-            new_base.append(_lw_update(method, si, sj, sk, dak, dbk, dab))
-            new_pen.append(P[i, k] + P[j, k])
-
-        keep = [k for k in range(len(labels)) if k not in (i, j)]
-        D = D[np.ix_(keep, keep)]
-        P = P[np.ix_(keep, keep)]
-        sizes = sizes[keep]
-        labels = [labels[k] for k in keep]
-
-        if len(labels) > 0:
-            nb = np.maximum(np.asarray(new_base, float), 0.0)
-            D = np.pad(D, ((0, 1), (0, 1)), constant_values=0.0)
-            P = np.pad(P, ((0, 1), (0, 1)), constant_values=0.0)
-            D[-1, :-1] = D[:-1, -1] = nb
-            P[-1, :-1] = P[:-1, -1] = np.asarray(new_pen, float)
-
-        sizes = np.append(sizes, si + sj)
-        labels.append(next_id)
-        next_id += 1
-
     return Z
 
 def _fast_linkage_lazy(
@@ -552,6 +463,10 @@ def constrained_linkage(
 
     # --- preprocess distances & penalties exactly once ---
     D = _to_square(np.asarray(y))
+    n = D.shape[0]
+    if n < 2:
+        raise ValueError("Need at least 2 observations.")
+    
     if normalize_distances:
         mx = D.max()
         if mx > 0:

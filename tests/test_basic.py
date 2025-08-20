@@ -126,3 +126,17 @@ def test_all_valid_passes():
         min_penalty_weight=0.5, max_penalty_weight=0.5,
         normalize_distances=True
     )
+
+def test_unknown_method_raises():
+    # Distances: just a tiny valid 2x2 distance matrix
+    D = np.array([[0.0, 1.0],
+                  [1.0, 0.0]])
+
+    # Call with a bogus method string
+    with pytest.raises(ValueError):
+        constrained_linkage(D, method="unknown")
+
+@pytest.mark.parametrize("y", [np.zeros((1, 1)), np.array([])])
+def test_too_few_observations_public(y):
+    with pytest.raises(ValueError, match="Need at least 2 observations."):
+        constrained_linkage(y, method="average")

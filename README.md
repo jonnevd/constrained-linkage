@@ -1,4 +1,5 @@
 [![Tests](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml/badge.svg)](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/jonnevd/constrained-linkage/branch/main/graph/badge.svg)](https://codecov.io/gh/jonnevd/constrained-linkage)
 [![PyPI version](https://img.shields.io/pypi/v/constrained-linkage.svg)](https://pypi.org/project/constrained-linkage/)
 
 # Constrained Hierarchical Agglomerative Clustering
@@ -38,9 +39,12 @@ A **NumPy-only** hierarchical agglomerative clustering routine with **soft const
   - **Must-link / Cannot-link** via a constraint matrix `M`
     - `M[i,j] < 0` → encourages merging (must-link)
     - `M[i,j] > 0` → discourages merging (cannot-link)
-    - When `normalize_distances=True`, these penalties are scaled relative to the [0, 1] normalized distance range, making them proportional regardless of the original distance scale.
   - **Min/max cluster size** penalties (linear in violation amount)
-    - Similarly scales proportionally when `normalize_distances=True`
+    - Minimum adds a penalty when a merge would create a cluster smaller than the specified minimum.
+    - Maximum adds a penalty when a merge would create a cluster larger than the specified maximum.
+    - Penalty grows linearly with how far below/above the minimum/maximum the cluster size is. 
+  - **Normalised** distances
+    - When `normalize_distances=True`, the penalties are relative to the [0, 1] normalized distance range, making them proportional regardless of the original distance scale.
 - No SciPy dependency — output `Z` works with SciPy’s downstream tools.
 
 ---
