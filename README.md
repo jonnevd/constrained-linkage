@@ -1,5 +1,5 @@
 [![Tests](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml/badge.svg)](https://github.com/jonnevd/constrained-linkage/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/jonnevd/constrained-linkage/branch/main/graph/badge.svg)](https://codecov.io/gh/jonnevd/constrained-linkage)
+[![Coverage Status](https://img.shields.io/codecov/c/github/jonnevd/constrained-linkage/main.svg)](https://app.codecov.io/github/jonnevd/constrained-linkage/branch/main)
 [![PyPI version](https://img.shields.io/pypi/v/constrained-linkage.svg)](https://pypi.org/project/constrained-linkage/)
 
 # Constrained Hierarchical Agglomerative Clustering
